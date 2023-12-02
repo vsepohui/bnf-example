@@ -4,18 +4,94 @@
 
 use strict;
 use warnings;
+use experimental 'smartmatch';
 use 5.022;
 
-my $math = "sin(cos(200)+5+2*2)+5";
-#@my $math = "2+2";
+my $math = "sin(cos(200)+5+cos(1)*2+2)+5+5*sin(444)+5/2";
+
 
 use Data::Dumper;
 say Dumper (parse($math, {}));
+
+# Hack method for fix math priority: setup brackets to multi and div
+sub prepare_multi_and_div {
+	my $str = shift;
+
+	my @s = split //, $str;
+	my $l = scalar (@s);
+		
+	for (my $i = 0 ; $i < $l ; $i ++) {
+		my $c = $s[$i];
+		if ($c ~~ ['*', '/']) {
+			# Go back
+			for (my $j = $i - 1; $j >= 0 ; $j --) {
+				my $cnt = 0;
+				if ($j eq ')') {
+					$cnt ++;
+					next;
+				} 
+				if ($j eq '(') {
+					$cnt --;
+				}
+				last if $cnt == -1;
+				if (($j == 0) || ($c ~~ ['+','-','/','*'])) {
+					# Setup brackets
+					# Go backward
+					for (my $k = $j -1 ; $k >= 0 ; $k --) {
+						if ($k == 0) {
+							@s = ('(', @s);
+							$i ++;
+							$j ++;
+							$k ++;
+							$l ++;
+							last;
+						} 
+						
+						if ($s[$k] ~~ ['+','-','*','/']) {
+							my @s1 = splice(@s, 0, $k+1);
+							@s = (@s1, '(', @s);
+							$i ++;
+							$j ++;
+							$k ++;
+							$l ++;
+							last;
+						}
+					}
+					# Go forward
+					for (my $k = $i + 1 ; $k < $l ; $k ++) {
+						if ($k == $l - 1) {
+							push @s, ')';
+							$i ++;
+							$j ++;
+							$k ++;
+							$l ++;
+							last;
+						} 
+						if ($s[$k] ~~ ['+','-','*','/']) {
+							my @s1 = splice(@s, 0, $k);
+							@s = (@s1, ')', @s);
+							$i ++;
+							$j ++;
+							$k ++;
+							$l ++;
+							last;
+						}
+					}
+					
+					last;
+				}
+			}
+		}
+	}
+	
+	return (scalar (@s) >= length ($str)) ? join '', @s : $str;
+}
 
 sub parse {
 	my $str  = shift;
 	my $node = shift;
 	
+	$str = prepare_multi_and_div($str);
 	warn "Parse $str";
 	
 	my @s = split //, $str;
@@ -33,6 +109,7 @@ sub parse {
 		my $c = $s[$i];
 		
 		if ($c =~ /[a-z]/) { # fuction processiong
+			warn "Starting function processing";
 			my $j;
 			my $func_end = 0;
 			my $buff = '';
@@ -74,6 +151,7 @@ sub parse {
 			warn "Found function = $func, buff = $buff";
 			push @expression, {$func => parse($buff)};
 		} elsif ($c eq '(') {
+			warn "Starting expression processing";
 			my $j;
 			my $buff = '';
 			for ($j = $i + 0; $j < @s ; $j ++) {
@@ -99,6 +177,7 @@ sub parse {
 			$function = '';
 			next;
 		} elsif ($c =~ /[0-9]/) {
+			warn "Starting digit processing";
 			$digit .= $c;
 			my $j;
 			my $buff = $digit;
@@ -154,6 +233,9 @@ sub parse {
 				warn "$cnt, $buff";
 				
 				if ($cnt < 0 || $j == ($sl-1)) {
+#					if ($o eq ')') {
+#						$buff = substr($buff, 0, length($buff)-1);
+#					}
 					push @expression, parse ($buff);
 					last;
 				} 
