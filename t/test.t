@@ -11,6 +11,9 @@ use constant TESTS => [
 	"2+2",
 	"-2",
 	"sin(123)*214.4-1/2",
+	"cos(-1)-1",
+	"2**4",
+	"2**4+4**2/1",
 ];
 
 use Test::More tests => scalar @{TESTS()};

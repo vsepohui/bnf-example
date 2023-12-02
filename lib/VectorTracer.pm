@@ -21,7 +21,7 @@ sub new {
 		digit 	=> '',
 		debug   => $opts{debug},
 		functions => {map {$_ => 1} qw/sin cos/},
-		operators => {map {$_ => 1} ('+', '-', '*', '/')},
+		operators => {map {$_ => 1} ('+', '-', '*', '/', '**')},
 	};
 	
 	return bless $self, $class;
@@ -56,6 +56,7 @@ sub trace {
 			return $a - $b if ($key eq '-');
 			return $a * $b if ($key eq '*');
 			return $a / $b if ($key eq '/');
+			return $a ** $b if ($key eq '**');
 		}
 	} elsif (ref $node eq 'ARRAY') {
 		
@@ -74,6 +75,8 @@ sub prepare_multi_and_div {
 	for (my $i = 0 ; $i < $l ; $i ++) {
 		my $c = $s[$i];
 		if ($c ~~ ['*', '/']) {
+			my $op = $c;
+			$op = '**' if $s[$i+1] eq '*';
 			# Go back
 			for (my $j = $i - 1; $j >= 0 ; $j --) {
 				my $cnt = 0;
@@ -85,6 +88,7 @@ sub prepare_multi_and_div {
 					$cnt --;
 				}
 				last if $cnt == -1;
+				#warn "j==$j";
 				if (($j == 0) || $self->{operators}->{$c}) {
 					# Setup brackets
 					# Go backward
@@ -109,6 +113,7 @@ sub prepare_multi_and_div {
 						}
 					}
 					# Go forward
+					$j ++ if $op eq '**';
 					for (my $k = $j + 2 ; $k < $l ; $k ++) {
 						#warn $k;
 						if ($self->{operators}->{$s[$k]}) {
@@ -193,8 +198,12 @@ sub _parse {
 	for (my $i = 0; $i < @s; $i++) {
 		my $c = $s[$i];
 		$self->debug($c);
-		if ($c ~~ ['+', '-', '*', '/']) {
+		if ($self->{operators}->{$c}) {
 			my $op = $c;
+			if ($op eq '*' && $s[$i+1] eq '*') {
+				$op = '**';
+				$i ++;
+			}
 			$self->debug("op = $op");
 			if ($self->{digit}) {
 				push @expression, $self->{digit};

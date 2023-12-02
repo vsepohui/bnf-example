@@ -8,12 +8,12 @@ use VectorTracer;
 
 use Data::Dumper;
 
-my $math = "sin(123)*214.4-1/2";
+my $math = "2**4";
 
 
-my $tracer = new VectorTracer(debug => 0);
+my $tracer = new VectorTracer(debug => 1);
 my $node = $tracer->parse($math);
-#say Dumper $node;
+say Dumper $node;
 say $tracer->trace();
 
 1;
