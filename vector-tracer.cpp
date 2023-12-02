@@ -9,8 +9,10 @@ class Node {
 	public:
 		Node () {}
 		bool is_hash = false;
+		bool is_string = false;
 		map <string, Node*> hash_node;
 		vector <Node*> vector_node;
+		vector <string> strings;
 		
 };
 
@@ -20,6 +22,8 @@ class VectorTracer {
 	public:
 		Node * node = NULL;
 		string digit = "";
+		int digit_step = 0;
+		
 		VectorTracer() {
 		}
 		void parse(string str) {
@@ -136,6 +140,43 @@ class VectorTracer {
 		Node * _parse (string s) {
 			return new Node;
 		}
+		
+
+		Node * _parse_digit (string s) {
+			int i = 0;
+			char c = s[0];
+			
+			Node * node = new Node;
+			this->digit += c;
+			
+			int j;
+			string buff = this->digit;
+			bool had_non_digit = false;
+			
+			for (j = i + 1; j < s.length() ; j ++) {
+				char o = s[j];
+				if (isdigit(o) || o == '.') {
+					buff += o;
+				} else {
+					had_non_digit = true;
+					break;
+				}
+			}
+			
+			if (had_non_digit) {
+				i = j - 1;
+				this->digit = buff;
+				node->strings.push_back(buff);
+				node->is_string = true;
+			} else {
+				i = j;
+				this->digit = buff;
+				node->strings.push_back(buff);
+				node->is_string = true;
+			}
+			this->digit_step = i;
+			return node;
+		}	
 				
 		Node * _depack (Node *node) {
 			if (node->is_hash) {
@@ -160,7 +201,8 @@ class VectorTracer {
 						v[i] = this->_depack(v[i]);
 					}
 				}
-			} 
+			}
+			
 			return node;
 		}
 };
