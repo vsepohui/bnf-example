@@ -6,11 +6,11 @@ use strict;
 use warnings;
 use 5.022;
 
-my $math = "sin(cos(200)+5+2*2)+5";
-#@my $math = "2+2";
+my $math = "sin(100)/20+2+2*sin(66)/cos(123)";
+#my $math = "2+2";
 
 use Data::Dumper;
-say Dumper (parse($math, {}));
+say Dumper (parse($math));
 
 
 # Hack method for fix math priority: setup brackets to multi and div
@@ -90,14 +90,13 @@ sub prepare_multi_and_div {
 
 sub parse {
 	my $str  = shift;
-	my $node = shift;
 	$str = prepare_multi_and_div($str);
-	return _parse($str, $node);
+	return _parse($str);
 }
 
 sub _parse {
 	my $str  = shift;
-	my $node = shift;
+	my $node = [];
 	
 	warn "Parse $str";
 	
@@ -115,7 +114,73 @@ sub _parse {
 	for (my $i = 0; $i < @s; $i++) {
 		my $c = $s[$i];
 		
-		if ($c =~ /[a-z]/) { # fuction processiong
+		if ($c ~~ ['+', '-', '*', '/']) {
+			my $op = $c;
+			warn "op = $op";
+			if ($digit) {
+				push @expression, $digit;
+				$digit = '';
+			}
+			$node = {$op => [$node]};
+			#push @$node, {$op => [@expression]};
+			
+			my $j;
+			my $buff = '';
+			my $cnt = 0;
+			
+			for ($j = $i + 1; $j < @s ; $j ++) {
+				my $o = $s[$j];
+				if ($o eq '(') {
+					$cnt ++;
+					#next;
+				}
+				if ($o eq ')') {
+					$cnt --;
+				} 
+				
+				
+				
+				$buff .= $o;
+				warn "$cnt, $buff";
+				
+				if ($cnt < 0 || $j == ($sl-1)) {
+					#die $buff;
+					#push @{$node->[-1]->{$op}}, _parse ($buff);
+					push @{$node->{$op}}, _parse ($buff);
+					last;
+				} 
+			}
+			$i = $j;
+			
+			#@expression = ();
+		} elsif ($c eq '(') {
+			my $j;
+			my $buff = '';
+			for ($j = $i + 0; $j < @s ; $j ++) {
+				my $o = $s[$j];
+				warn $o;
+				$buff .= $o;
+				my $cnt = 0;
+				if ($o eq '(') {
+					$cnt ++;
+					next;
+				}
+				if ($o eq ')' || $j == scalar (@s) - 1) {
+					warn "$cnt , cnt00";
+					$cnt --;
+					if ($cnt == -1) {
+						warn "Buff sub = $buff";
+						#die $function;
+						push @$node, _parse(substr($buff,1,-1));
+						#$node->{$function} = _parse($buff);
+						last;
+					}
+				}
+			}
+			$i = $j;
+			$function = '';
+			next;
+		} elsif ($c =~ /[a-z]/) { # fuction processiong
 			my $j;
 			my $func_end = 0;
 			my $buff = '';
@@ -143,7 +208,7 @@ sub _parse {
 						}
 						
 					}
-					$buff =~ s/^(.+).$/$1/;
+					#$buff =~ s/^(.+).$/$1/;
 					$j = $j2;
 					last;
 				} elsif ($func_end == 0) {
@@ -155,32 +220,7 @@ sub _parse {
 			$i = $j;	
 			
 			warn "Found function = $func, buff = $buff";
-			push @expression, {$func => _parse($buff)};
-		} elsif ($c eq '(') {
-			my $j;
-			my $buff = '';
-			for ($j = $i + 0; $j < @s ; $j ++) {
-				my $o = $s[$j];
-				warn $o;
-				$buff .= $o;
-				my $cnt = 0;
-				if ($o eq '(') {
-					$cnt ++;
-					next;
-				}
-				if ($o eq ')') {
-					warn "$cnt , cnt00";
-					$cnt --;
-					if ($cnt == 0) {
-						warn "Buff sub = $buff";
-					#	$node->{$function} = _parse($buff);
-						last;
-					}
-				}
-			}
-			$i = $j;
-			$function = '';
-			next;
+			push @$node, {$func => _parse($buff)};
 		} elsif ($c =~ /[0-9]/) {
 			$digit .= $c;
 			my $j;
@@ -198,57 +238,17 @@ sub _parse {
 			
 			if ($had_non_digit) {
 				$i = $j - 1;
-				next;
-				#$digit = $buff;
-				#warn "Found digit = $digit";
-				#push @expression, $digit;
+				$digit = substr($buff, 0, length ($buff) );
+				warn "Found digit = $digit";
+				push @$node, $digit;
 			} else {
 				$i = $j;
 				$digit = $buff;
 				warn "Found digit = $digit";
-				push @expression, $digit;
+				push @$node, $digit;
 			}
-		} elsif ($c ~~ ['+', '-', '*', '/']) {
-			my $op = $c;
-			warn "op = $op";
-			if ($digit) {
-				push @expression, $digit;
-				$digit = '';
-			}
-			$node->{$op} = \@expression;
-			
-			my $j;
-			my $buff = '';
-			my $cnt = 0;
-			
-			for ($j = $i + 1; $j < @s ; $j ++) {
-				my $o = $s[$j];
-				if ($o eq '(') {
-					$cnt ++;
-					next;
-				}
-				if ($o eq ')') {
-					$cnt --;
-				} 
-				
-				
-				
-				$buff .= $o;
-				warn "$cnt, $buff";
-				
-				if ($cnt < 0 || $j == ($sl-1)) {
-					push @expression, _parse ($buff);
-					last;
-				} 
-			}
-			$i = $j;
 		}
 	}
-	
-	
-	if (@expression && !keys %$node) {
-		return \@expression;
-	}
-	
+		
 	return $node;
 }
