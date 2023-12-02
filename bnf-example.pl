@@ -4,14 +4,14 @@
 
 use strict;
 use warnings;
-use experimental 'smartmatch';
 use 5.022;
 
-my $math = "sin(cos(200)+5+cos(1)*2+2)+5+5*sin(444)+5/2";
-
+my $math = "sin(cos(200)+5+2*2)+5";
+#@my $math = "2+2";
 
 use Data::Dumper;
 say Dumper (parse($math, {}));
+
 
 # Hack method for fix math priority: setup brackets to multi and div
 sub prepare_multi_and_div {
@@ -87,11 +87,18 @@ sub prepare_multi_and_div {
 	return (scalar (@s) >= length ($str)) ? join '', @s : $str;
 }
 
+
 sub parse {
 	my $str  = shift;
 	my $node = shift;
-	
 	$str = prepare_multi_and_div($str);
+	return _parse($str, $node);
+}
+
+sub _parse {
+	my $str  = shift;
+	my $node = shift;
+	
 	warn "Parse $str";
 	
 	my @s = split //, $str;
@@ -109,7 +116,6 @@ sub parse {
 		my $c = $s[$i];
 		
 		if ($c =~ /[a-z]/) { # fuction processiong
-			warn "Starting function processing";
 			my $j;
 			my $func_end = 0;
 			my $buff = '';
@@ -149,9 +155,8 @@ sub parse {
 			$i = $j;	
 			
 			warn "Found function = $func, buff = $buff";
-			push @expression, {$func => parse($buff)};
+			push @expression, {$func => _parse($buff)};
 		} elsif ($c eq '(') {
-			warn "Starting expression processing";
 			my $j;
 			my $buff = '';
 			for ($j = $i + 0; $j < @s ; $j ++) {
@@ -168,7 +173,7 @@ sub parse {
 					$cnt --;
 					if ($cnt == 0) {
 						warn "Buff sub = $buff";
-					#	$node->{$function} = parse($buff);
+					#	$node->{$function} = _parse($buff);
 						last;
 					}
 				}
@@ -177,7 +182,6 @@ sub parse {
 			$function = '';
 			next;
 		} elsif ($c =~ /[0-9]/) {
-			warn "Starting digit processing";
 			$digit .= $c;
 			my $j;
 			my $buff = $digit;
@@ -233,10 +237,7 @@ sub parse {
 				warn "$cnt, $buff";
 				
 				if ($cnt < 0 || $j == ($sl-1)) {
-#					if ($o eq ')') {
-#						$buff = substr($buff, 0, length($buff)-1);
-#					}
-					push @expression, parse ($buff);
+					push @expression, _parse ($buff);
 					last;
 				} 
 			}
