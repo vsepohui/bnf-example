@@ -4,21 +4,49 @@
 
 use strict;
 use warnings;
-use experimental 'smartmatch';
+
 use 5.022;
 use Data::Dumper;
 
-my $math = "sin(100)/20+2+2*sin(66)/cos(123)";
+my $math = "2+2*2+cos(0)";
 
 my $tracer = new VectorTracer;
 my $graf = $tracer->parse($math);
-say Dumper $graf;
+say $tracer->trace($graf);
 
 package VectorTracer;
+
+use strict;
+use warnings;
+use experimental 'smartmatch';
+
+use Data::Dumper;
 
 sub new {
 	my $class = shift;
 	return bless {}, $class;
+}
+
+sub trace {
+	my $self = shift;
+	my $node = shift;
+
+	if (ref $node eq 'HASH') {
+		my ($key, $value) = each %$node;
+		if ($key ~~ [qw/sin cos/]) {
+			return sin($self->trace($value)) if ($key eq 'sin');
+			return cos($self->trace($value)) if ($key eq 'cos');
+		} elsif ($key ~~ ['+', '-', '*', '/']) {
+			return $self->trace($value->[0]) + $self->trace($value->[1]) if ($key eq '+');
+			return $self->trace($value->[0]) - $self->trace($value->[1]) if ($key eq '-');
+			return $self->trace($value->[0]) * $self->trace($value->[1]) if ($key eq '*');
+			return $self->trace($value->[0]) / $self->trace($value->[1]) if ($key eq '/');
+		}
+	} elsif (ref $node eq 'ARRAY') {
+		die 'wtf?';
+	} else {
+		return $node;
+	}
 }
 
 # Hack method for fix math priority: setup brackets to multi and div
