@@ -8,11 +8,11 @@ use warnings;
 use 5.022;
 use Data::Dumper;
 
-my $math = "2.1+2*2+cos(0)";
+my $math = "2-2*cos(10)*10";
 
-my $tracer = new VectorTracer;
-my $graf = $tracer->parse($math);
-say $tracer->trace($graf);
+my $tracer = new VectorTracer(debug => 0);
+my $node = $tracer->parse($math);
+say $tracer->trace();
 
 package VectorTracer;
 
@@ -24,29 +24,54 @@ use Data::Dumper;
 
 sub new {
 	my $class = shift;
-	return bless {}, $class;
+	my %opts  = (
+		debug => 0,
+		@_,
+	);
+	
+	my $self = bless {
+		node	=> undef,
+		digit 	=> '',
+		debug   => $opts{debug},
+	}, $class;
+	
+	return $self;
+}
+
+
+sub debug {
+	my $self = shift;
+	my $msg  = shift;
+	
+	if ($self->{debug}) {
+		warn '['.scalar(localtime).'] '. $msg . "\n";
+	}
+	return;
 }
 
 sub trace {
 	my $self = shift;
-	my $node = shift;
-
+	my $node = shift // $self->{node};
+	
 	if (ref $node eq 'HASH') {
 		my ($key, $value) = each %$node;
 		if ($key ~~ [qw/sin cos/]) {
-			return sin($self->trace($value)) if ($key eq 'sin');
-			return cos($self->trace($value)) if ($key eq 'cos');
+			my $a = $self->trace($value);
+			return sin($a) if ($key eq 'sin');
+			return cos($a) if ($key eq 'cos');
 		} elsif ($key ~~ ['+', '-', '*', '/']) {
-			return $self->trace($value->[0]) + $self->trace($value->[1]) if ($key eq '+');
-			return $self->trace($value->[0]) - $self->trace($value->[1]) if ($key eq '-');
-			return $self->trace($value->[0]) * $self->trace($value->[1]) if ($key eq '*');
-			return $self->trace($value->[0]) / $self->trace($value->[1]) if ($key eq '/');
+			my ($a, $b) = @$value;
+			$a = $self->trace($a);
+			$b = $self->trace($b);
+			return $a + $b if ($key eq '+');
+			return $a - $b if ($key eq '-');
+			return $a * $b if ($key eq '*');
+			return $a / $b if ($key eq '/');
 		}
 	} elsif (ref $node eq 'ARRAY') {
-		die 'wtf?';
-	} else {
-		return $node;
+		
 	}
+	return int $node;
 }
 
 # Hack method for fix math priority: setup brackets to multi and div
@@ -129,7 +154,9 @@ sub parse {
 	my $self = shift;
 	my $str  = shift;
 	$str = $self->prepare_multi_and_div($str);
-	return $self->_depack($self->_parse ($str));
+	my $node = $self->_depack($self->_parse ($str));
+	$self->{node} = $node;
+	return $node;
 }
 
 sub _depack {
@@ -156,11 +183,12 @@ sub _parse {
 	my $str  = shift;
 	my $node = [];
 	
+	$self->debug("Parse $str");
+	
 	my @s = split //, $str;
 	my $sl = scalar (@s);
 	
 	my $function = '';
-	my $digit = '';
 	my @expression = ();
 	
 	my $value = {};
@@ -169,15 +197,31 @@ sub _parse {
 	
 	for (my $i = 0; $i < @s; $i++) {
 		my $c = $s[$i];
-		
+		$self->debug($c);
 		if ($c ~~ ['+', '-', '*', '/']) {
 			my $op = $c;
-			#warn "op = $op";
-			if ($digit) {
-				push @expression, $digit;
-				$digit = '';
+			$self->debug("op = $op");
+			if ($self->{digit}) {
+				push @expression, $self->{digit};
+				$self->{digit} = '';
 			}
-			$node = {$op => [$node]};
+			if (@$node) {
+				$node = {$op => $node};
+			} else {
+				if ($op ~~ ['+', '-']) {
+					my ($n, $idx) = $self->_parse_digit([@s[$i..$sl - 1]]);
+					#push @$node, $n;
+					$self->{digit} = $n;
+					#push @expression, $self->{digit};
+					push @$node, $self->{digit};
+					$self->{digit} = '';
+					$i = $i + $idx;
+					
+					#die $i;
+					next;
+					
+				}
+			}
 			#push @$node, {$op => [@expression]};
 			
 			my $j;
@@ -197,7 +241,7 @@ sub _parse {
 				
 				
 				$buff .= $o;
-				#warn "$cnt, $buff";
+				$self->debug("$cnt, $buff");
 				
 				if ($cnt < 0 || $j == ($sl-1)) {
 					#die $buff;
@@ -214,7 +258,7 @@ sub _parse {
 			my $buff = '';
 			for ($j = $i + 0; $j < @s ; $j ++) {
 				my $o = $s[$j];
-				#warn $o;
+				$self->debug($o);
 				$buff .= $o;
 				my $cnt = 0;
 				if ($o eq '(') {
@@ -222,12 +266,12 @@ sub _parse {
 					next;
 				}
 				if ($o eq ')' || $j == scalar (@s) - 1) {
-					#warn "$cnt , cnt00";
+					$self->debug("$cnt , cnt00");
 					$cnt --;
 					if ($cnt == -1) {
-						#warn "Buff sub = $buff";
+						$self->debug("Buff sub = $buff");
 						#die $function;
-						push @$node, $self->_parse(substr($buff,1,-1));
+						push @$node, $self->_parse(substr($buff,1));
 						#$node->{$function} = $self->_parse($buff);
 						last;
 					}
@@ -265,6 +309,7 @@ sub _parse {
 						
 					}
 					#$buff =~ s/^(.+).$/$1/;
+					warn $buff;
 					$j = $j2;
 					last;
 				} elsif ($func_end == 0) {
@@ -275,36 +320,52 @@ sub _parse {
 			}
 			$i = $j;	
 			
-			#warn "Found function = $func, buff = $buff";
+			$self->debug("Found function = $func, buff = $buff");
 			push @$node, {$func => $self->_parse($buff)};
 		} elsif ($c =~ /[0-9\.]/) {
-			$digit .= $c;
-			my $j;
-			my $buff = $digit;
-			my $had_non_digit = 0;
-			for ($j = $i + 1; $j < @s ; $j ++) {
-				my $o = $s[$j];
-				if ($o =~ /[0-9\.]/) {
-					$buff .= $o;
-				} else {
-					$had_non_digit = 1;
-					last;
-				}
-			}
-			
-			if ($had_non_digit) {
-				$i = $j - 1;
-				$digit = substr($buff, 0, length ($buff) );
-				#warn "Found digit = $digit";
-				push @$node, $digit;
-			} else {
-				$i = $j;
-				$digit = $buff;
-				#warn "Found digit = $digit";
-				push @$node, $digit;
-			}
+			my ($n, $idx) = $self->_parse_digit([@s[$i..$sl - 1]]);
+			$i = $idx + $i;
+			push @$node, $n;
 		}
 	}
 		
 	return $node;
+}
+
+sub _parse_digit {
+	my $self = shift;
+	my $s = shift;
+	my @s = @$s;
+	
+	my $i = 0;
+	my $c = $s[0];
+	
+	my $node = [];
+	
+	$self->{digit} .= $c;
+	my $j;
+	my $buff = $self->{digit};
+	my $had_non_digit = 0;
+	for ($j = $i + 1; $j < @s ; $j ++) {
+		my $o = $s[$j];
+		if ($o =~ /[0-9\.]/) {
+			$buff .= $o;
+		} else {
+			$had_non_digit = 1;
+			last;
+		}
+	}
+	
+	if ($had_non_digit) {
+		$i = $j - 1;
+		$self->{digit} = substr($buff, 0, length ($buff) );
+		$self->debug("Found digit = ".$self->{digit});
+		push @$node, $self->{digit};
+	} else {
+		$i = $j;
+		$self->{digit} = $buff;
+		$self->debug("Found digit = ".$self->{digit});
+		push @$node, $self->{digit};
+	}
+	return ($node, $i);
 }
