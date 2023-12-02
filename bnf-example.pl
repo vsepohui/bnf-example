@@ -4,10 +4,11 @@
 
 use strict;
 use warnings;
+use experimental 'smartmatch';
 use 5.022;
 
-my $math = "sin(100)/20+2+2*sin(66)/cos(123)";
-#my $math = "2+2";
+#my $math = "sin(100)/20+2+2*sin(66)/cos(123)";
+my $math = "2+2";
 
 use Data::Dumper;
 say Dumper (parse($math));
@@ -91,14 +92,30 @@ sub prepare_multi_and_div {
 sub parse {
 	my $str  = shift;
 	$str = prepare_multi_and_div($str);
-	return _parse($str);
+	return _depack(_parse ($str));
+}
+
+sub _depack {
+	my $node = shift;
+	if (ref $node eq 'HASH') {
+		my ($key, $value) = each %$node;
+		$node = {$key => _depack ($value)};
+	} elsif (ref $node eq 'ARRAY') {
+		if (scalar (@$node) == 1) {
+			$node = $node->[0];
+			return _depack($node) ;
+		} else {
+			for (@$node) {
+				$_ = _depack ($_);
+			}
+		}
+	} 
+	return $node;
 }
 
 sub _parse {
 	my $str  = shift;
 	my $node = [];
-	
-	warn "Parse $str";
 	
 	my @s = split //, $str;
 	my $sl = scalar (@s);
@@ -116,7 +133,7 @@ sub _parse {
 		
 		if ($c ~~ ['+', '-', '*', '/']) {
 			my $op = $c;
-			warn "op = $op";
+			#warn "op = $op";
 			if ($digit) {
 				push @expression, $digit;
 				$digit = '';
@@ -141,7 +158,7 @@ sub _parse {
 				
 				
 				$buff .= $o;
-				warn "$cnt, $buff";
+				#warn "$cnt, $buff";
 				
 				if ($cnt < 0 || $j == ($sl-1)) {
 					#die $buff;
@@ -158,7 +175,7 @@ sub _parse {
 			my $buff = '';
 			for ($j = $i + 0; $j < @s ; $j ++) {
 				my $o = $s[$j];
-				warn $o;
+				#warn $o;
 				$buff .= $o;
 				my $cnt = 0;
 				if ($o eq '(') {
@@ -166,10 +183,10 @@ sub _parse {
 					next;
 				}
 				if ($o eq ')' || $j == scalar (@s) - 1) {
-					warn "$cnt , cnt00";
+					#warn "$cnt , cnt00";
 					$cnt --;
 					if ($cnt == -1) {
-						warn "Buff sub = $buff";
+						#warn "Buff sub = $buff";
 						#die $function;
 						push @$node, _parse(substr($buff,1,-1));
 						#$node->{$function} = _parse($buff);
@@ -219,7 +236,7 @@ sub _parse {
 			}
 			$i = $j;	
 			
-			warn "Found function = $func, buff = $buff";
+			#warn "Found function = $func, buff = $buff";
 			push @$node, {$func => _parse($buff)};
 		} elsif ($c =~ /[0-9]/) {
 			$digit .= $c;
@@ -239,12 +256,12 @@ sub _parse {
 			if ($had_non_digit) {
 				$i = $j - 1;
 				$digit = substr($buff, 0, length ($buff) );
-				warn "Found digit = $digit";
+				#warn "Found digit = $digit";
 				push @$node, $digit;
 			} else {
 				$i = $j;
 				$digit = $buff;
-				warn "Found digit = $digit";
+				#warn "Found digit = $digit";
 				push @$node, $digit;
 			}
 		}
