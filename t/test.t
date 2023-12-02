@@ -25,12 +25,8 @@ sub test_expression {
 	my $str = shift;
 	$tracer->parse($str);
 	my $result = $tracer->trace();
-	return $result eq (eval $str);
+	return ($result == (eval $str));
 	
 }
-
-return 1;
-
-
 
 1;

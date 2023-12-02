@@ -60,7 +60,7 @@ sub trace {
 	} elsif (ref $node eq 'ARRAY') {
 		
 	}
-	return int $node;
+	return $node;
 }
 
 # Hack method for fix math priority: setup brackets to multi and div
@@ -206,6 +206,7 @@ sub _parse {
 				$node = {$op => $node};
 			} else {
 				if ($op ~~ ['+', '-']) {
+					
 					my ($n, $idx) = $self->_parse_digit([@s[$i..$sl - 1]]);
 					#push @$node, $n;
 					$self->{digit} = $n;
@@ -247,7 +248,12 @@ sub _parse {
 					#warn Dumper $node->{$op};
 					if (ref $node->{$op} eq 'HASH') {
 						#warn Dumper $node;
-						#push @{}, $self->_parse ($buff);
+						$node = {
+							$op => [
+								$node->{$op},
+								$self->_parse ($buff),
+							],
+						};
 					} else {
 						push @{$node->{$op}}, $self->_parse ($buff);
 					}
