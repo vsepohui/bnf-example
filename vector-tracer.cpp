@@ -10,7 +10,7 @@ class Node {
 		Node () {}
 		bool is_hash = false;
 		map <string, Node*> hash_node;
-		map <string, vector<Node*>> vector_node;
+		vector <Node*> vector_node;
 		
 };
 
@@ -19,10 +19,18 @@ class Node {
 class VectorTracer {
 	public:
 		Node * node = NULL;
+		string digit = "";
 		VectorTracer() {
 		}
 		void parse(string str) {
+			this->digit = "";
+			this->node = NULL;
+			str = this->prepare_multi_and_div(str);
+			Node *n = this->_depack(this->_parse(str));
+			this->node = n;
+			return;
 		}
+				
 		float trace (Node *node_param = NULL) {
 			Node *node = NULL;
 			if (node_param == NULL) {
@@ -40,7 +48,7 @@ class VectorTracer {
 					if (key.compare("sin")) return sin(a);
 					if (key.compare("cos")) return cos(a);
 				} else if (key.compare("+") or key.compare("-") or key.compare("*") or key.compare("/") or key.compare("**")) {
-					vector<Node*> v = value->vector_node[key];
+					vector<Node*> v = value->vector_node;
 					auto i = v.begin();
 					float a = this->trace(i[0]);
 					float b = this->trace(i[1]);
@@ -124,8 +132,37 @@ class VectorTracer {
 			}
 			return s;
 		}
+		
+		Node * _parse (string s) {
+			return new Node;
+		}
 				
-			
+		Node * _depack (Node *node) {
+			if (node->is_hash) {
+				auto it = node->hash_node.begin();
+				string key = it->first;
+				Node *value = it->second;
+				
+				Node * node = new Node;
+				node->is_hash = true;
+
+				map <string, Node*> n;
+				n[key] = this->_depack (value);
+				node->hash_node = n;
+			} else {
+				auto v = node->vector_node;
+				if (v.size() == 1) {
+					auto n = node[0];
+					return this->_depack(&n) ;
+				} else {
+					for (int i = 0; i < v.size() ; i++) {
+						// Node *n = v[i];
+						v[i] = this->_depack(v[i]);
+					}
+				}
+			} 
+			return node;
+		}
 };
 
 int main () {
