@@ -8,7 +8,7 @@ use warnings;
 use 5.022;
 use Data::Dumper;
 
-my $math = "2+2*2+cos(0)";
+my $math = "2.1+2*2+cos(0)";
 
 my $tracer = new VectorTracer;
 my $graf = $tracer->parse($math);
@@ -277,14 +277,14 @@ sub _parse {
 			
 			#warn "Found function = $func, buff = $buff";
 			push @$node, {$func => $self->_parse($buff)};
-		} elsif ($c =~ /[0-9]/) {
+		} elsif ($c =~ /[0-9\.]/) {
 			$digit .= $c;
 			my $j;
 			my $buff = $digit;
 			my $had_non_digit = 0;
 			for ($j = $i + 1; $j < @s ; $j ++) {
 				my $o = $s[$j];
-				if ($o =~ /[0-9]/) {
+				if ($o =~ /[0-9\.]/) {
 					$buff .= $o;
 				} else {
 					$had_non_digit = 1;
