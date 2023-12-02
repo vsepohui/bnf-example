@@ -6,16 +6,24 @@ use strict;
 use warnings;
 use experimental 'smartmatch';
 use 5.022;
-
-#my $math = "sin(100)/20+2+2*sin(66)/cos(123)";
-my $math = "2+2";
-
 use Data::Dumper;
-say Dumper (parse($math));
 
+my $math = "sin(100)/20+2+2*sin(66)/cos(123)";
+
+my $tracer = new VectorTracer;
+my $graf = $tracer->parse($math);
+say Dumper $graf;
+
+package VectorTracer;
+
+sub new {
+	my $class = shift;
+	return bless {}, $class;
+}
 
 # Hack method for fix math priority: setup brackets to multi and div
 sub prepare_multi_and_div {
+	my $self = shift;
 	my $str = shift;
 
 	my @s = split //, $str;
@@ -90,23 +98,25 @@ sub prepare_multi_and_div {
 
 
 sub parse {
+	my $self = shift;
 	my $str  = shift;
-	$str = prepare_multi_and_div($str);
-	return _depack(_parse ($str));
+	$str = $self->prepare_multi_and_div($str);
+	return $self->_depack($self->_parse ($str));
 }
 
 sub _depack {
+	my $self = shift;
 	my $node = shift;
 	if (ref $node eq 'HASH') {
 		my ($key, $value) = each %$node;
-		$node = {$key => _depack ($value)};
+		$node = {$key => $self->_depack ($value)};
 	} elsif (ref $node eq 'ARRAY') {
 		if (scalar (@$node) == 1) {
 			$node = $node->[0];
-			return _depack($node) ;
+			return $self->_depack($node) ;
 		} else {
 			for (@$node) {
-				$_ = _depack ($_);
+				$_ = $self->_depack ($_);
 			}
 		}
 	} 
@@ -114,6 +124,7 @@ sub _depack {
 }
 
 sub _parse {
+	my $self = shift;
 	my $str  = shift;
 	my $node = [];
 	
@@ -162,8 +173,8 @@ sub _parse {
 				
 				if ($cnt < 0 || $j == ($sl-1)) {
 					#die $buff;
-					#push @{$node->[-1]->{$op}}, _parse ($buff);
-					push @{$node->{$op}}, _parse ($buff);
+					#push @{$node->[-1]->{$op}}, $self->_parse ($buff);
+					push @{$node->{$op}}, $self->_parse ($buff);
 					last;
 				} 
 			}
@@ -188,8 +199,8 @@ sub _parse {
 					if ($cnt == -1) {
 						#warn "Buff sub = $buff";
 						#die $function;
-						push @$node, _parse(substr($buff,1,-1));
-						#$node->{$function} = _parse($buff);
+						push @$node, $self->_parse(substr($buff,1,-1));
+						#$node->{$function} = $self->_parse($buff);
 						last;
 					}
 				}
@@ -237,7 +248,7 @@ sub _parse {
 			$i = $j;	
 			
 			#warn "Found function = $func, buff = $buff";
-			push @$node, {$func => _parse($buff)};
+			push @$node, {$func => $self->_parse($buff)};
 		} elsif ($c =~ /[0-9]/) {
 			$digit .= $c;
 			my $j;
